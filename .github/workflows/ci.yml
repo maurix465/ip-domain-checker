@@ -8,23 +8,19 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Python ${{ matrix.python-version }}
+  quality:
+    name: Ruff
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.14"]
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: pip
 
       - name: Install project and development tools
@@ -38,5 +34,137 @@ jobs:
       - name: Ruff format check
         run: ruff format --check .
 
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install project and development tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
       - name: Test
         run: pytest
+
+  release-verification:
+    name: Release verification
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install release tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Check artifact metadata and contents
+        run: |
+          python -m twine check dist/*
+          python scripts/verify_release_artifacts.py dist
+
+      - name: Install and smoke-test the wheel in isolation
+        run: |
+          python -m venv "${RUNNER_TEMP}/wheel-venv"
+          "${RUNNER_TEMP}/wheel-venv/bin/python" -m pip install dist/*.whl
+          "${RUNNER_TEMP}/wheel-venv/bin/python" -m pip check
+          "${RUNNER_TEMP}/wheel-venv/bin/check-blacklist" --help
+          "${RUNNER_TEMP}/wheel-venv/bin/check-blacklist" clean.example \
+            --config examples/blacklists.yaml
+          set +e
+          "${RUNNER_TEMP}/wheel-venv/bin/check-blacklist" blocked.example \
+            --config examples/blacklists.yaml
+          status=$?
+          set -e
+          if [ "${status}" -ne 1 ]; then
+            echo "Expected listed smoke test to exit 1, got ${status}" >&2
+            exit 1
+          fi
+
+      - name: Add ignored host build-context fixtures
+        run: |
+          mkdir -p src/blacklist_checker/__pycache__
+          mkdir -p src/host-only.egg-info
+          mkdir -p build
+          printf '%s\n' "HOST_BUILD_CONTEXT_SENTINEL ${GITHUB_WORKSPACE}" \
+            > src/blacklist_checker/__pycache__/host-context.pyc
+          printf '%s\n' "HOST_BUILD_CONTEXT_SENTINEL ${GITHUB_WORKSPACE}" \
+            > src/host-only.egg-info/PKG-INFO
+          printf '%s\n' "HOST_BUILD_CONTEXT_SENTINEL ${GITHUB_WORKSPACE}" \
+            > build/host-context.txt
+
+      - name: Verify Docker build-context exclusions
+        run: |
+          printf '%s\n' \
+            'FROM python:3.12-slim' \
+            'COPY . /context' \
+            > "${RUNNER_TEMP}/Dockerfile.context-audit"
+          docker build \
+            --file "${RUNNER_TEMP}/Dockerfile.context-audit" \
+            --tag ip-domain-checker:context-audit .
+          docker run --rm --entrypoint sh ip-domain-checker:context-audit \
+            -eu -c '
+              test ! -e /context/src/blacklist_checker/__pycache__/host-context.pyc
+              test ! -e /context/src/host-only.egg-info/PKG-INFO
+              test ! -e /context/build/host-context.txt
+            '
+
+      - name: Build Docker image
+        run: docker build --tag ip-domain-checker:ci .
+
+      - name: Smoke-test Docker CLI
+        run: |
+          docker run --rm ip-domain-checker:ci --help
+          docker run --rm \
+            --mount "type=bind,src=${PWD}/examples,dst=/data,readonly" \
+            ip-domain-checker:ci clean.example --config /data/blacklists.yaml
+          set +e
+          docker run --rm \
+            --mount "type=bind,src=${PWD}/examples,dst=/data,readonly" \
+            ip-domain-checker:ci blocked.example --config /data/blacklists.yaml
+          status=$?
+          set -e
+          if [ "${status}" -ne 1 ]; then
+            echo "Expected Docker listed smoke test to exit 1, got ${status}" >&2
+            exit 1
+          fi
+
+      - name: Verify clean non-root container runtime
+        run: |
+          uid="$(docker run --rm --entrypoint id ip-domain-checker:ci -u)"
+          if [ "${uid}" -eq 0 ]; then
+            echo "Container runs as root" >&2
+            exit 1
+          fi
+          docker run --rm --entrypoint python \
+            --mount \
+            "type=bind,src=${PWD}/scripts/verify_container_runtime.py,dst=/tmp/verify-container.py,readonly" \
+            ip-domain-checker:ci /tmp/verify-container.py \
+            --forbidden-text "${GITHUB_WORKSPACE}"

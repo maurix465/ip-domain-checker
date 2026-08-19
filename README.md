@@ -82,7 +82,10 @@ to a source kind are rejected. Disabled sources are still validated, then
 omitted from the scan. At least one source must be enabled. Configuration files
 are loaded safely and limited to 1 MiB.
 
-Two configuration examples are included:
+The repository checkout and source distribution include two configuration
+examples. They are not installed as runtime package data by a normal wheel or
+`pip` installation; use them from a checkout or an unpacked source
+distribution:
 
 - [`examples/blacklists.yaml`](examples/blacklists.yaml) demonstrates the
   configuration schema. Its local source uses a small non-production list,
@@ -95,7 +98,8 @@ Two configuration examples are included:
 
 ### Real-world integration test
 
-After reviewing the third-party provider terms, run a manual test with:
+From the repository or unpacked source-distribution root, and after reviewing
+the third-party provider terms, run a manual test with:
 
 ```console
 check-blacklist TARGET --config examples/public-blacklists.yaml
@@ -275,7 +279,7 @@ errors.
 
 ## Docker
 
-Build the image:
+From a repository checkout, build the image:
 
 ```console
 docker build -t ip-domain-checker .

@@ -257,6 +257,74 @@ def test_csv_preserves_quoted_multiline_fields() -> None:
     assert parsed.malformed_entries == 0
 
 
+@pytest.mark.parametrize(
+    "continuation_line",
+    ["# continuation", ";; continuation", ""],
+    ids=["hash", "double-semicolon", "blank"],
+)
+def test_csv_preserves_comment_like_multiline_continuations(
+    continuation_line: str,
+) -> None:
+    lines = [
+        "description,indicator\r\n",
+        '"first line\r\n',
+        f"{continuation_line}\r\n",
+        'last line",example.org\r\n',
+    ]
+    options = CsvOptions(has_header=True, column="description")
+
+    candidates = list(checkers._iter_csv_candidates(lines, ("#", ";;"), options))
+
+    assert candidates == [f"first line\r\n{continuation_line}\r\nlast line"]
+
+
+def test_csv_ignores_comments_and_blank_lines_between_records() -> None:
+    content = (
+        b"# before header\r\n"
+        b"description,indicator\r\n"
+        b"first,example.org\r\n"
+        b"# between records\r\n"
+        b";; another comment\r\n"
+        b"\r\n"
+        b"second,example.net\r\n"
+    )
+    source = make_local_source(
+        Path("unused.csv"),
+        list_format=ListFormat.CSV,
+        comment_prefixes=("#", ";;"),
+        csv_options=CsvOptions(has_header=True, column="indicator"),
+    )
+
+    parsed = parse_static_list(content, source)
+
+    assert parsed.domains == frozenset({"example.org", "example.net"})
+    assert parsed.entries_read == 2
+    assert parsed.malformed_entries == 0
+
+
+@pytest.mark.asyncio
+async def test_malformed_multiline_csv_with_comment_like_lines_is_an_error(
+    tmp_path: Path,
+) -> None:
+    list_path = tmp_path / "indicators.csv"
+    list_path.write_text(
+        'description,indicator\n"unterminated\n# continuation\n;; continuation\n\n',
+        encoding="utf-8",
+    )
+    source = make_local_source(
+        list_path,
+        list_format=ListFormat.CSV,
+        comment_prefixes=("#", ";;"),
+        csv_options=CsvOptions(has_header=True, column="indicator"),
+    )
+
+    result = await run_local_check(source, "example.com")
+
+    assert_error(result, ErrorKind.PARSE)
+    assert result.failure is not None
+    assert "malformed CSV data" in result.failure.message
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("csv_text", "error_message"),

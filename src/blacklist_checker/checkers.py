@@ -493,16 +493,7 @@ def _iter_csv_candidates(
     comment_prefixes: tuple[str, ...],
     options: CsvOptions,
 ) -> Iterator[str | None]:
-    filtered_lines = (
-        line
-        for line in lines
-        if line.strip() and not _is_comment(line, comment_prefixes)
-    )
-    reader = csv.reader(
-        filtered_lines,
-        delimiter=options.delimiter,
-        strict=True,
-    )
+    reader = _iter_csv_rows(lines, comment_prefixes, options.delimiter)
 
     try:
         if options.has_header:
@@ -544,6 +535,32 @@ def _iter_csv_candidates(
             ErrorKind.PARSE,
             f"malformed CSV data: {error}",
         ) from error
+
+
+def _iter_csv_rows(
+    lines: Iterable[str],
+    comment_prefixes: tuple[str, ...],
+    delimiter: str,
+) -> Iterator[list[str]]:
+    at_record_boundary = True
+
+    def record_aware_lines() -> Iterator[str]:
+        nonlocal at_record_boundary
+        for line in lines:
+            if at_record_boundary and (
+                not line.strip() or _is_comment(line, comment_prefixes)
+            ):
+                continue
+            at_record_boundary = False
+            yield line
+
+    reader = csv.reader(record_aware_lines(), delimiter=delimiter, strict=True)
+    while True:
+        at_record_boundary = True
+        try:
+            yield next(reader)
+        except StopIteration:
+            return
 
 
 def _normalize_candidates(

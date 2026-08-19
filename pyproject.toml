@@ -6,6 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "ip-domain-checker"
 version = "0.1.0"
 description = "Check IP addresses and domains against configured threat intelligence sources."
+authors = [{ name = "Maurizio Venanzini" }]
+maintainers = [{ name = "Maurizio Venanzini" }]
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -16,6 +18,11 @@ dependencies = [
     "PyYAML>=6.0.2",
     "rich>=13.9.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/maurix465/ip-domain-checker"
+Repository = "https://github.com/maurix465/ip-domain-checker"
+Issues = "https://github.com/maurix465/ip-domain-checker/issues"
 
 [project.optional-dependencies]
 dev = [
