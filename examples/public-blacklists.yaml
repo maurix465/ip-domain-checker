@@ -1,0 +1,149 @@
+# Public third-party sources for low-volume manual integration testing.
+#
+# These services are operated by independent providers, not by this project.
+# Their availability, policies, endpoints, and data formats may change.
+# Users are responsible for reviewing and respecting each provider's current
+# terms, licenses, rate limits, and acceptable-use policies before use.
+#
+# Provider documentation and feed formats were last verified on 2026-08-19.
+# Static-list matching in ip-domain-checker is exact; these feeds therefore
+# expose bare IP addresses or domains rather than CIDRs, URLs, or host-file rows.
+version: 1
+
+defaults:
+  dns_timeout_seconds: 5.0
+  http_timeout_seconds: 20.0
+  max_static_bytes: 8388608
+
+sources:
+  # SpamCop SCBL: free DNSBL for IPv4 addresses recently reported as sending
+  # spam. SpamCop explicitly documents manual and custom-software DNS queries.
+  # Documentation: https://www.spamcop.net/bl.shtml
+  - name: spamcop-scbl
+    kind: dnsbl
+    category: spam
+    supports: [ipv4]
+    host: bl.spamcop.net
+    timeout_seconds: 5.0
+
+  # PSBL: passive spam-trap data published as a freely usable IPv4 DNSBL;
+  # its documentation states that anybody is free to use it.
+  # Documentation: https://psbl.org/howto/
+  - name: psbl
+    kind: dnsbl
+    category: spam
+    supports: [ipv4]
+    host: psbl.surriel.com
+    timeout_seconds: 5.0
+
+  # DroneBL: compromised hosts, bots, open proxies, and brute-force sources.
+  # DNSBL access is free for commercial and non-commercial use.
+  # Documentation: https://dronebl.org/docs/howtouse
+  - name: dronebl
+    kind: dnsbl
+    category: botnet-and-abuse
+    supports: [ipv4]
+    host: dnsbl.dronebl.org
+    timeout_seconds: 5.0
+
+  # blocklist.de DNSBL: IPv4 addresses observed attacking participant systems.
+  # Use this public service only at low volume.
+  # Documentation: https://www.blocklist.de/en/rbldns.html
+  - name: blocklist-de-all
+    kind: dnsbl
+    category: abuse
+    supports: [ipv4]
+    host: all.bl.blocklist.de
+    timeout_seconds: 5.0
+
+  # abuse.ch Feodo Tracker: botnet C2 IPv4 indicators, including malware family
+  # context in a documented CSV. The application extracts the dst_ip column.
+  # Feodo Tracker publishes its datasets under CC0.
+  # Documentation: https://feodotracker.abuse.ch/blocklist/
+  - name: feodo-tracker-c2
+    kind: http_static
+    category: malware-c2
+    supports: [ipv4]
+    url: https://feodotracker.abuse.ch/downloads/ipblocklist.csv
+    format: csv
+    encoding: utf-8-sig
+    comment_prefixes: ["#"]
+    timeout_seconds: 20.0
+    max_static_bytes: 1048576
+    csv:
+      has_header: true
+      column: dst_ip
+      delimiter: ","
+
+  # Emerging Threats Open: known compromised or hostile IPv4 addresses.
+  # Feed URL and GPLv2 availability are confirmed by the official ET forum:
+  # https://community.emergingthreats.net/t/676
+  - name: emerging-threats-compromised-ips
+    kind: http_static
+    category: compromised-hosts
+    supports: [ipv4]
+    url: https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+    format: txt
+    encoding: utf-8-sig
+    comment_prefixes: ["#"]
+    timeout_seconds: 20.0
+    max_static_bytes: 1048576
+
+  # Sentinel IPS CINS Army: high-risk IPv4 addresses observed by its sensor
+  # network and trusted alert sources. CINS publishes it as a simple text file
+  # that may be parsed and used by network administrators.
+  # Documentation: https://cinsscore.com/
+  - name: cins-army
+    kind: http_static
+    category: malicious-ips
+    supports: [ipv4]
+    url: https://cinsscore.com/list/ci-badguys.txt
+    format: txt
+    encoding: utf-8-sig
+    comment_prefixes: ["#"]
+    timeout_seconds: 20.0
+    max_static_bytes: 1048576
+
+  # blocklist.de: IPv4 addresses seen attacking web logins with brute force.
+  # The provider documents one IP address per line; use only at low volume.
+  # Documentation: https://www.blocklist.de/en/export.html
+  - name: blocklist-de-brute-force
+    kind: http_static
+    category: brute-force
+    supports: [ipv4]
+    url: https://lists.blocklist.de/lists/bruteforcelogin.txt
+    format: txt
+    encoding: utf-8-sig
+    comment_prefixes: ["#"]
+    timeout_seconds: 20.0
+    max_static_bytes: 1048576
+
+  # Phishing Army: curated phishing domains aggregated from public reports.
+  # The provider publishes this feed under CC BY-NC 4.0; users must ensure
+  # their intended use complies with that non-commercial license.
+  # Documentation: https://phishing.army/
+  - name: phishing-army
+    kind: http_static
+    category: phishing
+    supports: [domain]
+    url: https://phishing.army/download/phishing_army_blocklist.txt
+    format: txt
+    encoding: utf-8-sig
+    comment_prefixes: ["#"]
+    timeout_seconds: 30.0
+    max_static_bytes: 8388608
+
+  # CERT Polska Warning List: active domains used for phishing and other
+  # campaigns that deceive users and steal data. CERT Polska documents this
+  # exact endpoint as active domains with one domain per line.
+  # Documentation: https://cert.pl/lista-ostrzezen/
+  - name: cert-pl-warning-list
+    kind: http_static
+    category: malicious-domains
+    supports: [domain]
+    url: https://hole.cert.pl/domains/v2/domains.txt
+    format: txt
+    encoding: utf-8-sig
+    comment_prefixes: ["#"]
+    timeout_seconds: 30.0
+    max_static_bytes: 8388608

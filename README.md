@@ -82,9 +82,29 @@ to a source kind are rejected. Disabled sources are still validated, then
 omitted from the scan. At least one source must be enabled. Configuration files
 are loaded safely and limited to 1 MiB.
 
-See [`examples/blacklists.yaml`](examples/blacklists.yaml) for a complete
-example. Its local source uses a small non-production list, while its network
-sources are disabled placeholders.
+Two configuration examples are included:
+
+- [`examples/blacklists.yaml`](examples/blacklists.yaml) demonstrates the
+  configuration schema. Its local source uses a small non-production list,
+  while its network sources are disabled placeholders.
+- [`examples/public-blacklists.yaml`](examples/public-blacklists.yaml) uses
+  real third-party public services for low-volume manual integration testing.
+  Those services are independently operated, and their availability, formats,
+  policies, and rate limits may change. Review and follow each provider's
+  current terms and acceptable-use policy before running it.
+
+### Real-world integration test
+
+After reviewing the third-party provider terms, run a manual test with:
+
+```console
+check-blacklist TARGET --config examples/public-blacklists.yaml
+```
+
+Do not run this configuration in a tight loop: each invocation queries public
+DNSBL services and downloads every applicable remote list. A `LISTED` result
+means that the provider currently lists the target according to its own
+criteria; it does not by itself prove that the target is malicious.
 
 ### Root schema
 
