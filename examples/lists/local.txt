@@ -1,0 +1,4 @@
+# Demonstration indicators only; this is not threat intelligence.
+192.0.2.10
+2001:db8::10
+blocked.example

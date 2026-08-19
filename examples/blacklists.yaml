@@ -1,0 +1,44 @@
+# Example configuration. The network sources use placeholder endpoints and
+# remain disabled. Replace them with sources you are authorized to query.
+version: 1
+
+defaults:
+  dns_timeout_seconds: 5.0
+  http_timeout_seconds: 15.0
+  max_static_bytes: 10485760
+
+sources:
+  - name: local-example
+    kind: local_static
+    category: example
+    enabled: true
+    supports: [ipv4, ipv6, domain]
+    path: lists/local.txt
+    format: txt
+    encoding: utf-8-sig
+    comment_prefixes: ["#", ";"]
+    max_static_bytes: 1048576
+
+  - name: dnsbl-placeholder
+    kind: dnsbl
+    category: example
+    enabled: false
+    supports: [ipv4, ipv6]
+    host: dnsbl.example.org
+    timeout_seconds: 3.0
+
+  - name: remote-csv-placeholder
+    kind: http_static
+    category: example
+    enabled: false
+    supports: [ipv4, ipv6, domain]
+    url: https://example.org/indicators.csv
+    format: csv
+    encoding: utf-8-sig
+    comment_prefixes: ["#", ";"]
+    timeout_seconds: 10.0
+    max_static_bytes: 5242880
+    csv:
+      has_header: true
+      column: indicator
+      delimiter: ","
